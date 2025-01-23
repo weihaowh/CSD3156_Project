@@ -87,6 +87,13 @@ fun ExpenseApp() {
     NavHost(navController, startDestination = "overview") {
         composable("overview") { OverviewScreen(navController) }
         composable("addExpense") { AddExpenseScreen(navController) }
+        composable("selectCategory") {
+            CategorySelectionScreen(navController) { selectedCategory ->
+                navController.previousBackStackEntry
+                    ?.savedStateHandle
+                    ?.set("category", selectedCategory)
+            }
+        }
     }
 }
 
@@ -147,6 +154,10 @@ fun OverviewScreen(navController: NavController) {
 fun AddExpenseScreen(navController: NavController) {
     var category by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
+    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
+    savedStateHandle?.getLiveData<String>("category")?.observeForever { selectedCategory ->
+        category = selectedCategory
+    }
 
     Scaffold(
         topBar = {
@@ -166,11 +177,14 @@ fun AddExpenseScreen(navController: NavController) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TextField(
-                value = category,
-                onValueChange = { category = it },
-                label = { Text("Category") }
-            )
+            Button(
+                onClick = { navController.navigate("selectCategory") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (category.isEmpty()) "Select Category" else "Category: $category"
+                )
+            }
             TextField(
                 value = amount,
                 onValueChange = { amount = it },
@@ -179,7 +193,7 @@ fun AddExpenseScreen(navController: NavController) {
             )
             Button(
                 onClick = {
-                    // Save expense logic (for now, log or pass data back)
+                    // Save expense logic
                     navController.popBackStack()
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -190,3 +204,52 @@ fun AddExpenseScreen(navController: NavController) {
     }
 }
 
+@Composable
+fun CategorySelectionScreen(navController: NavController, onCategorySelected: (String) -> Unit) {
+    val categories = listOf("Food", "Transport", "Shopping", "Entertainment", "Utilities", "Other")
+    Scaffold(
+        topBar = {
+            @OptIn(ExperimentalMaterial3Api::class)
+            TopAppBar(
+                title = { Text("Select Category") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Select a category for the expense:",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            LazyColumn {
+                items(categories.size) { index ->
+                    val category = categories[index]
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                onCategorySelected(category)
+                                navController.popBackStack()
+                            }
+                    ) {
+                        Text(
+                            text = category,
+                            modifier = Modifier.padding(16.dp),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
