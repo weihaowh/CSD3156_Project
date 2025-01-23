@@ -97,13 +97,14 @@ fun ExpenseApp() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(navController: NavController) {
     val expenses = remember { mutableStateListOf<Pair<String, String>>() } // Mock expense list
+    var showBottomSheet by remember { mutableStateOf(false) } // State to control bottom sheet visibility
 
     Scaffold(
         topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("Personal Expense Tracker") },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -112,7 +113,7 @@ fun OverviewScreen(navController: NavController) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { navController.navigate("addExpense") }) {
+            FloatingActionButton(onClick = { showBottomSheet = true }) {
                 Text("+")
             }
         }
@@ -125,7 +126,7 @@ fun OverviewScreen(navController: NavController) {
         ) {
             // Total Expense Overview
             Text(
-                text = "Total Expense: $${expenses.sumOf { it.second.toDoubleOrNull() ?: 0.0 }}",
+                text = "Total Expense: $${expenses.sumOf { it.second.toDoubleOrNull() ?: 0.00 }}",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
@@ -143,6 +144,47 @@ fun OverviewScreen(navController: NavController) {
                             Text("Category: $category", style = MaterialTheme.typography.bodyLarge)
                             Text("Amount: $amount", style = MaterialTheme.typography.bodyMedium)
                         }
+                    }
+                }
+            }
+        }
+
+        // Bottom Sheet for FAB Options
+        if (showBottomSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false }
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Add Expense",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+
+                    Button(
+                        onClick = {
+                            showBottomSheet = false
+                            // Logic to open the camera
+                            Log.d("FAB", "Camera option selected")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Camera")
+                    }
+
+                    Button(
+                        onClick = {
+                            showBottomSheet = false
+                            navController.navigate("addExpense") // Navigate to AddExpenseScreen
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Add Manually")
                     }
                 }
             }
