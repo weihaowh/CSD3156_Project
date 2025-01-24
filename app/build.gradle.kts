@@ -58,4 +58,9 @@ dependencies {
     implementation(libs.androidx.ui.test.junit4.android)
     implementation(libs.androidx.espresso.core)
     implementation(libs.androidx.uiautomator)
+    implementation("androidx.compose.ui:ui:1.5.0") // Use the latest stable version
+    implementation("androidx.compose.material:material:1.5.0")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.5.0")
+    implementation("androidx.activity:activity-compose:1.7.2") // Compose activity integration
+    implementation("androidx.activity:activity-ktx:1.7.2") // Latest stable version
 }
