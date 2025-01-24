@@ -6,6 +6,8 @@ import android.util.Log
 import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -102,6 +104,15 @@ fun ExpenseApp() {
 fun OverviewScreen(navController: NavController) {
     val expenses = remember { mutableStateListOf<Pair<String, String>>() } // Mock expense list
     var showBottomSheet by remember { mutableStateOf(false) } // State to control bottom sheet visibility
+    var capturedImage by remember { mutableStateOf<android.graphics.Bitmap?>(null) } // Store the captured image
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            capturedImage = bitmap // Save the captured image
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -169,8 +180,7 @@ fun OverviewScreen(navController: NavController) {
                     Button(
                         onClick = {
                             showBottomSheet = false
-                            // Logic to open the camera
-                            Log.d("FAB", "Camera option selected")
+                            launcher.launch(null) // Launch the camera
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
