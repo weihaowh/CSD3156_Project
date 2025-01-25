@@ -191,6 +191,12 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+            // Title for the Expense List
+            Text(
+                text = "Expense List",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
             // Expense List
             LazyColumn(Modifier.fillMaxSize()) {
                 items(expenses.size) { index ->
