@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -260,9 +261,9 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
 
 @Composable
 fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense>) {
-    var category by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
+    var category by rememberSaveable  { mutableStateOf("Others") }
+    var description by rememberSaveable  { mutableStateOf("") }
+    var amount by rememberSaveable  { mutableStateOf("") }
     val focusManager: FocusManager = LocalFocusManager.current
     val context = LocalContext.current
 
@@ -311,19 +312,23 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             )
             Button(
                 onClick = {
-                    val amountValue = amount.toDoubleOrNull()
-                    if (amountValue == null || amountValue <= 0) {
-                        Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+                    if (category.isEmpty()) {
+                        Toast.makeText(context, "Please select a category", Toast.LENGTH_SHORT).show()
                     } else {
-                        expenses.add(
-                            Expense(
-                                category = category,
-                                amount = amountValue,
-                                description = description.ifBlank { null }
+                        val amountValue = amount.toDoubleOrNull()
+                        if (amountValue == null || amountValue <= 0) {
+                            Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+                        } else {
+                            expenses.add(
+                                Expense(
+                                    category = category,
+                                    amount = amountValue,
+                                    description = description.ifBlank { null }
+                                )
                             )
-                        )
-                        focusManager.clearFocus()
-                        navController.popBackStack()
+                            focusManager.clearFocus()
+                            navController.popBackStack()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
