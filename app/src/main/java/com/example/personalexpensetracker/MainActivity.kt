@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Bundle
+import android.os.Build
 import android.util.Log
 import android.widget.EditText
 import androidx.activity.ComponentActivity
@@ -73,12 +74,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.widget.Toast
 import android.net.Uri
 import java.io.File
@@ -87,11 +91,19 @@ import android.app.Activity
 import android.provider.MediaStore
 import android.view.View
 import androidx.core.app.ActivityCompat.startActivityForResult
-
+import coil.compose.rememberAsyncImagePainter
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val CAMERA_PERMISSION_CODE = 100
     private var capturedImageUri: Uri? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -100,28 +112,26 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    fun requestCameraPermission() {
-        if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            openCamera()
+
+    fun requestCameraPermission(context: Context, navController: NavController) {
+        if (context.checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            openCamera(context, navController)
         } else {
-            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+            (context as Activity).requestPermissions(arrayOf(android.Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
         }
     }
 
-    private fun openCamera() {
-        val imageUri = createImageUri(this)
-        capturedImageUri = imageUri
+    private fun openCamera(context: Context, navController: NavController) {
+        val imageUri = createImageUri(context)
+
         val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
             putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
         }
-        startActivityForResult(intent, CAMERA_PERMISSION_CODE)
-    }
+        (context as Activity).startActivityForResult(intent, 200)
 
-    @Deprecated("This method has been deprecated in favor of using the Activity Result API")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == CAMERA_PERMISSION_CODE && resultCode == Activity.RESULT_OK) {
-            Toast.makeText(this, "Image saved at: $capturedImageUri", Toast.LENGTH_LONG).show()
+        if (imageUri != null) {
+            navController.currentBackStackEntry?.savedStateHandle?.set("capturedImageUri", imageUri.toString())
+            navController.navigate(Screen.AddExpense.route)
         }
     }
 }
@@ -166,6 +176,20 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
     var showBottomSheet by remember { mutableStateOf(false) } // State to control bottom sheet visibility
     val context = LocalContext.current
 
+    // Image Picker Launcher
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+        onResult = { uri: Uri? ->
+            uri?.let {
+                Toast.makeText(context, "Selected Image: $uri", Toast.LENGTH_SHORT).show()
+                // Navigate to add expense screen with the selected image URI
+                navController.currentBackStackEntry
+                    ?.savedStateHandle
+                    ?.set("selectedImageUri", it.toString())
+                navController.navigate(Screen.AddExpense.route)
+            }
+        }
+    )
     Scaffold(
         topBar = {
             TopAppBar(
@@ -176,7 +200,8 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showBottomSheet = true }) {
+            FloatingActionButton(onClick = {
+                showBottomSheet = true }) {
                 Text("+")
             }
         }
@@ -213,6 +238,15 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                             Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
                             Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
                             Text("Amount: $${expense.amount}", style = MaterialTheme.typography.bodyMedium)
+                            expense.imageUri?.let {
+                                Image(
+                                    painter = rememberAsyncImagePainter(it),
+                                    contentDescription = "Receipt Image",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(150.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -239,11 +273,21 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                     Button(
                         onClick = {
                             showBottomSheet = false
-                            (context as MainActivity).requestCameraPermission()
+                            (context as MainActivity).requestCameraPermission(context, navController)
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Camera")
+                    }
+
+                    Button(
+                        onClick = {
+                            showBottomSheet = false
+                            galleryLauncher.launch("image/*") // Opens gallery
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Image Gallery")
                     }
 
                     Button(
@@ -266,12 +310,51 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
     var category by rememberSaveable { mutableStateOf("Others") }
     var description by rememberSaveable { mutableStateOf("") }
     var amount by rememberSaveable { mutableStateOf("") }
+    var imageUri by rememberSaveable { mutableStateOf<String?>(null) }
     val focusManager: FocusManager = LocalFocusManager.current
     val context = LocalContext.current
 
-    val savedStateHandle = navController.currentBackStackEntry?.savedStateHandle
-    savedStateHandle?.getLiveData<String>("category")?.observeForever { selectedCategory ->
-        category = selectedCategory
+    // Retrieve selected/captured image URI
+    val savedStateHandle = navController.previousBackStackEntry?.savedStateHandle
+    LaunchedEffect(Unit) {
+        // Set imageUri to the image captured by the camera
+        savedStateHandle?.get<String>("capturedImageUri")?.let {
+            imageUri = it
+        }
+        // Set imageUri to the image selected from the gallery
+        savedStateHandle?.get<String>("selectedImageUri")?.let {
+            imageUri = it
+        }
+        savedStateHandle?.get<String>("category")?.let {
+            category = it
+        }
+    }
+
+    // Function to extract text using OCR
+    suspend fun extractTextFromImage(imageUri: Uri) {
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val bitmap = loadBitmapFromUri(context, imageUri)
+
+        bitmap?.let {
+            val inputImage = InputImage.fromBitmap(it, 0)
+            try {
+                val result = withContext(Dispatchers.IO) { recognizer.process(inputImage).await() }
+                if (result.text.isNotEmpty()) {
+                    description = result.text // Auto-fill the description field
+                } else {
+                    Toast.makeText(context, "No text found in receipt.", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("OCR", "Error processing image: ${e.message}")
+            }
+        }
+    }
+
+    // When an image is selected, trigger OCR
+    LaunchedEffect(imageUri) {
+        imageUri?.let {
+            extractTextFromImage(Uri.parse(it))
+        }
     }
 
     Scaffold(
@@ -312,6 +395,17 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
+            // Display the captured image
+            imageUri?.let {
+                Image(
+                    painter = rememberAsyncImagePainter(it),
+                    contentDescription = "Selected Receipt Image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                )
+            }
+
             Button(
                 onClick = {
                     if (category.isEmpty()) {
@@ -325,7 +419,8 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                             val newExpense = Expense(
                                 category = category,
                                 amount = amountValue,
-                                description = description.ifBlank { null }
+                                description = description.ifBlank { null },
+                                imageUri = imageUri
                             )
                             expenses.add(newExpense)
 
@@ -345,7 +440,6 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         }
     }
 }
-
 
 @Composable
 fun CategorySelectionScreen(navController: NavController, onCategorySelected: (String) -> Unit) {
@@ -414,6 +508,21 @@ private fun createImageUri(context: Context): Uri? {
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", imageFile)
     } catch (e: IllegalArgumentException) {
         Log.e("CreateImageUri", "FileProvider URI creation failed: ${e.message}")
+        null
+    }
+}
+
+// Function to convert URI to Bitmap
+fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source)
+        } else {
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+    } catch (e: Exception) {
+        Log.e("OCR", "Failed to load image: ${e.message}")
         null
     }
 }

@@ -63,5 +63,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview:1.5.0")
     implementation("androidx.activity:activity-compose:1.7.2") // Compose activity integration
     implementation("androidx.activity:activity-ktx:1.7.2") // Latest stable version
-    implementation ("androidx.core:core:1.12.0")
+    implementation("androidx.core:core:1.12.0")
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")
 }
