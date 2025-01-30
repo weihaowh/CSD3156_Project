@@ -132,22 +132,21 @@ sealed class Screen(val route: String) {
     object SelectCategory : Screen("selectCategory")
 }
 
-@Serializable
-data class Expense(
-    val category: String,
-    val amount: Double,
-    val description: String? = null,
-    val imageUri: String? = null
-)
-
 @Composable
 fun ExpenseApp() {
+    val context = LocalContext.current
+    val expenses = remember { mutableStateListOf<Expense>() }
     val navController = rememberNavController()
-    val expenses = remember { mutableStateListOf<Expense>() } // Shared state
 
-    NavHost(navController, startDestination = "overview") {
-        composable(Screen.Overview.route) { OverviewScreen(navController,expenses) }
-        composable(Screen.AddExpense.route) { AddExpenseScreen(navController,expenses) }
+    // Load expenses when the app starts
+    LaunchedEffect(Unit) {
+        expenses.addAll(ExpenseDataManager.loadExpenses(context))
+    }
+
+    // Pass navController to NavHost
+    NavHost(navController = navController, startDestination = Screen.Overview.route) {
+        composable(Screen.Overview.route) { OverviewScreen(navController, expenses) }
+        composable(Screen.AddExpense.route) { AddExpenseScreen(navController, expenses) }
         composable(Screen.SelectCategory.route) {
             CategorySelectionScreen(navController) { selectedCategory ->
                 navController.previousBackStackEntry
@@ -157,6 +156,9 @@ fun ExpenseApp() {
         }
     }
 }
+
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -261,9 +263,9 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
 
 @Composable
 fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense>) {
-    var category by rememberSaveable  { mutableStateOf("Others") }
-    var description by rememberSaveable  { mutableStateOf("") }
-    var amount by rememberSaveable  { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf("Others") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var amount by rememberSaveable { mutableStateOf("") }
     val focusManager: FocusManager = LocalFocusManager.current
     val context = LocalContext.current
 
@@ -294,10 +296,9 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 onClick = { navController.navigate(Screen.SelectCategory.route) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (category.isEmpty()) "Select Category" else "Category: $category"
-                )
+                Text(text = if (category.isEmpty()) "Select Category" else "Category: $category")
             }
+
             TextField(
                 value = description,
                 onValueChange = { description = it },
@@ -310,6 +311,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 label = { Text("Amount") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
+
             Button(
                 onClick = {
                     if (category.isEmpty()) {
@@ -319,13 +321,18 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                         if (amountValue == null || amountValue <= 0) {
                             Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
                         } else {
-                            expenses.add(
-                                Expense(
-                                    category = category,
-                                    amount = amountValue,
-                                    description = description.ifBlank { null }
-                                )
+                            // Add new expense
+                            val newExpense = Expense(
+                                category = category,
+                                amount = amountValue,
+                                description = description.ifBlank { null }
                             )
+                            expenses.add(newExpense)
+
+                            // Save the updated list to file
+                            ExpenseDataManager.saveExpenses(context, expenses)
+
+                            // Clear input fields and return to previous screen
                             focusManager.clearFocus()
                             navController.popBackStack()
                         }
@@ -338,6 +345,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         }
     }
 }
+
 
 @Composable
 fun CategorySelectionScreen(navController: NavController, onCategorySelected: (String) -> Unit) {
