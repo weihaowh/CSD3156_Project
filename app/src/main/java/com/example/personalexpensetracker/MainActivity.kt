@@ -320,14 +320,17 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         // Set imageUri to the image captured by the camera
         savedStateHandle?.get<String>("capturedImageUri")?.let {
             imageUri = it
+            savedStateHandle.remove<String>("capturedImageUri") // Remove after retrieving
         }
         // Set imageUri to the image selected from the gallery
         savedStateHandle?.get<String>("selectedImageUri")?.let {
             imageUri = it
+            savedStateHandle.remove<String>("selectedImageUri") // Remove after retrieving
         }
     }
     savedStateHandle?.getLiveData<String>("category")?.observeForever { selectedCategory ->
         category = selectedCategory
+        savedStateHandle.remove<String>("category") // Remove after retrieving
     }
 
 
