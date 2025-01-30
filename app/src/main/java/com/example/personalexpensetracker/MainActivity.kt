@@ -102,6 +102,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val CAMERA_PERMISSION_CODE = 100
+    private val CAMERA_REQUEST_CODE = 200
     private var capturedImageUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -127,7 +128,7 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
             putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
         }
-        (context as Activity).startActivityForResult(intent, 200)
+        (context as Activity).startActivityForResult(intent, CAMERA_REQUEST_CODE)
 
         if (imageUri != null) {
             navController.currentBackStackEntry?.savedStateHandle?.set("capturedImageUri", imageUri.toString())
