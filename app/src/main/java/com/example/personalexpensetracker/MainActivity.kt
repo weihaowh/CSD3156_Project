@@ -325,10 +325,11 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         savedStateHandle?.get<String>("selectedImageUri")?.let {
             imageUri = it
         }
-        savedStateHandle?.get<String>("category")?.let {
-            category = it
-        }
     }
+    savedStateHandle?.getLiveData<String>("category")?.observeForever { selectedCategory ->
+        category = selectedCategory
+    }
+
 
     // Function to extract text using OCR
     suspend fun extractTextFromImage(imageUri: Uri) {
