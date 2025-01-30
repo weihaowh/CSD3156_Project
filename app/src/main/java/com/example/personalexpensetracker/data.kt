@@ -1,17 +1,26 @@
 package com.example.personalexpensetracker
 
 import android.content.Context
-import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class Expense(
     val category: String,
     val amount: Double,
     val description: String? = null,
-    val imageUri: String? = null
+    val imageUri: String? = null,
+    val dateTime: String = getCurrentDateTime() // Automatically assigns date and time
 )
+
+// Function to get the current date and time
+fun getCurrentDateTime(): String {
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    return LocalDateTime.now().format(formatter)
+}
 
 object ExpenseDataManager {
     private const val FILE_NAME = "expenses.json"
