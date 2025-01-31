@@ -173,6 +173,7 @@ fun ExpenseApp() {
 @Composable
 fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>) {
     val context = LocalContext.current
+    var showDialog by remember { mutableStateOf(false) } // Dialog state for confirmation
 
     Scaffold(
         topBar = {
@@ -195,18 +196,36 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+            // Total Expense Overview
             Text(
                 text = "Total Expense: $${"%.2f".format(expenses.sumOf { it.amount })}",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Text(
-                text = "Expense List",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            // Title Row with "Expense List" and "Clear All" Button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Expense List",
+                    style = MaterialTheme.typography.headlineSmall
+                )
 
+                // "Clear All" Button
+                Button(
+                    onClick = { showDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Clear All", color = Color.White)
+                }
+            }
+
+            // Expense List
             LazyColumn(Modifier.fillMaxSize()) {
                 items(expenses.size) { index ->
                     val expense = expenses[index]
@@ -222,9 +241,7 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(
-                                modifier = Modifier.weight(1f)
-                            ) {
+                            Column(Modifier.weight(1f)) {
                                 Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
                                 Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
                                 Text("Amount: $${"%.2f".format(expense.amount)}", style = MaterialTheme.typography.bodyMedium)
@@ -262,7 +279,36 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             }
         }
     }
+
+    // Confirmation Dialog for "Clear All" Button
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Clear All Expenses?") },
+            text = { Text("This will delete all expenses permanently. Are you sure?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        expenses.clear()
+                        ExpenseDataManager.saveExpenses(context, expenses)
+                        showDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    Text("Yes, Clear All", color = Color.White)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense>) {
