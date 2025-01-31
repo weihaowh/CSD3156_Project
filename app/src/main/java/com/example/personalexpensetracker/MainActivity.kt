@@ -86,8 +86,14 @@ import androidx.core.content.FileProvider
 import android.app.Activity
 import android.provider.MediaStore
 import android.view.View
+import androidx.compose.ui.text.TextStyle
 import androidx.core.app.ActivityCompat.startActivityForResult
-
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 
 class MainActivity : ComponentActivity() {
     private val CAMERA_PERMISSION_CODE = 100
@@ -143,7 +149,7 @@ fun ExpenseApp() {
         expenses.addAll(ExpenseDataManager.loadExpenses(context))
     }
 
-    // Pass navController to NavHost
+    // Navigation between screens
     NavHost(navController = navController, startDestination = Screen.Overview.route) {
         composable(Screen.Overview.route) { OverviewScreen(navController, expenses) }
         composable(Screen.AddExpense.route) { AddExpenseScreen(navController, expenses) }
@@ -154,16 +160,18 @@ fun ExpenseApp() {
                     ?.set("category", selectedCategory)
             }
         }
+        composable("editExpense/{index}") { backStackEntry ->
+            val index = backStackEntry.arguments?.getString("index")?.toIntOrNull()
+            if (index != null) {
+                EditExpenseScreen(navController, expenses, index)
+            }
+        }
     }
 }
-
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>) {
-    var showBottomSheet by remember { mutableStateOf(false) } // State to control bottom sheet visibility
     val context = LocalContext.current
 
     Scaffold(
@@ -176,7 +184,7 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showBottomSheet = true }) {
+            FloatingActionButton(onClick = { navController.navigate("addExpense") }) {
                 Text("+")
             }
         }
@@ -187,73 +195,68 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Total Expense Overview
             Text(
-                text = "Total Expense: $${expenses.sumOf { it.amount }}",
+                text = "Total Expense: $${"%.2f".format(expenses.sumOf { it.amount })}",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Title for the Expense List
             Text(
                 text = "Expense List",
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
-            // Expense List
+
             LazyColumn(Modifier.fillMaxSize()) {
                 items(expenses.size) { index ->
                     val expense = expenses[index]
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp)
+                            .padding(vertical = 4.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
-                            Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Amount: $${expense.amount}", style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
+                                Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
+                                Text("Amount: $${"%.2f".format(expense.amount)}", style = MaterialTheme.typography.bodyMedium)
+                                Text("Date: ${expense.dateTime}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+
+                            // Edit Button
+                            IconButton(
+                                onClick = { navController.navigate("editExpense/$index") },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = android.R.drawable.ic_menu_edit),
+                                    contentDescription = "Edit",
+                                    tint = Color.Blue
+                                )
+                            }
+
+                            // Delete Button
+                            IconButton(
+                                onClick = {
+                                    ExpenseDataManager.deleteExpense(context, expenses, index)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = android.R.drawable.ic_menu_delete),
+                                    contentDescription = "Delete",
+                                    tint = Color.Red
+                                )
+                            }
                         }
-                    }
-                }
-            }
-        }
-
-        // Bottom Sheet for FAB Options
-        if (showBottomSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showBottomSheet = false }
-            ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Add Expense",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-
-                    Button(
-                        onClick = {
-                            showBottomSheet = false
-                            (context as MainActivity).requestCameraPermission()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Camera")
-                    }
-
-                    Button(
-                        onClick = {
-                            showBottomSheet = false
-                            navController.navigate("addExpense") // Navigate to AddExpenseScreen
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Add Manually")
                     }
                 }
             }
@@ -418,3 +421,129 @@ private fun createImageUri(context: Context): Uri? {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditExpenseScreen(navController: NavController, expenses: MutableList<Expense>, expenseIndex: Int) {
+    val context = LocalContext.current
+    val focusManager: FocusManager = LocalFocusManager.current
+
+    // Load existing values
+    var category by rememberSaveable { mutableStateOf(expenses[expenseIndex].category) }
+    var description by rememberSaveable { mutableStateOf(expenses[expenseIndex].description ?: "") }
+    var amount by rememberSaveable { mutableStateOf(expenses[expenseIndex].amount.toString()) }
+
+    // Date & Time variables
+    var selectedDate by rememberSaveable { mutableStateOf(LocalDate.now()) }
+    var selectedTime by rememberSaveable { mutableStateOf(LocalTime.now()) }
+
+    // Automatically get the day of the week from the selected date
+    val dayOfWeek = selectedDate.dayOfWeek.getDisplayName(
+        java.time.format.TextStyle.FULL, Locale.getDefault()
+    )
+
+    // Date Picker Dialog
+    val datePickerDialog = android.app.DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            selectedDate = LocalDate.of(year, month + 1, day)
+        },
+        selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth
+    )
+
+    // Time Picker Dialog
+    val timePickerDialog = TimePickerDialog(
+        context,
+        { _, hour, minute ->
+            selectedTime = LocalTime.of(hour, minute)
+        },
+        selectedTime.hour, selectedTime.minute, false
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Edit Expense") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Category Input
+            TextField(
+                value = category,
+                onValueChange = { category = it },
+                label = { Text("Category") },
+                singleLine = true
+            )
+
+            // Description Input
+            TextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                singleLine = true
+            )
+
+            // Amount Input
+            TextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Amount") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
+            // Date Picker Button
+            Button(
+                onClick = { datePickerDialog.show() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "📅 Select Date: $selectedDate ($dayOfWeek)")
+            }
+
+            // Time Picker Button
+            Button(
+                onClick = { timePickerDialog.show() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = "⏰ Select Time: ${selectedTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}")
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        val updatedAmount = amount.toDoubleOrNull()
+                        if (updatedAmount != null && updatedAmount > 0) {
+                            val updatedExpense = Expense(
+                                category = category,
+                                amount = updatedAmount,
+                                description = description.ifBlank { null },
+                                dateTime = "$selectedDate ($dayOfWeek) ${selectedTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
+                            )
+                            expenses[expenseIndex] = updatedExpense
+                            ExpenseDataManager.saveExpenses(context, expenses)
+                            focusManager.clearFocus()
+                            navController.popBackStack()
+                        } else {
+                            Toast.makeText(context, "Enter a valid amount", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("Save Changes")
+                }
+
+                Button(
+                    onClick = { navController.popBackStack() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        }
+    }
+}
