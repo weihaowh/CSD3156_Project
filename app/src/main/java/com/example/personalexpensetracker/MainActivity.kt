@@ -715,9 +715,20 @@ fun EditExpenseScreen(navController: NavController, expenses: MutableList<Expens
                                 description = description.ifBlank { null },
                                 dateTime = "$selectedDate ($dayOfWeek) ${selectedTime.format(DateTimeFormatter.ofPattern("hh:mm a"))}"
                             )
+
+                            // Trigger recomposition by replacing the entire list
                             expenses[expenseIndex] = updatedExpense
+                            expenses.removeAt(expenseIndex)
+                            expenses.add(expenseIndex, updatedExpense)
+
+                            // Save to storage
+                            ExpenseDataManager.saveExpenses(context, expenses)
+
+                            // Clear focus & navigate back
+                            focusManager.clearFocus()
+                            navController.popBackStack()
                         }
-                    }
+            }
                 ) {
                     Text("Save Changes")
                 }
