@@ -18,21 +18,19 @@ data class Expense(
 
 // Function to get the current date and time
 fun getCurrentDateTime(): String {
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    val formatter = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy HH:mm:ss")
     return LocalDateTime.now().format(formatter)
 }
 
 object ExpenseDataManager {
     private const val FILE_NAME = "expenses.json"
 
-    // Save expenses to a JSON file
     fun saveExpenses(context: Context, expenses: List<Expense>) {
         val json = Json.encodeToString(expenses)
         val file = File(context.filesDir, FILE_NAME)
         file.writeText(json)
     }
 
-    // Load expenses from a JSON file
     fun loadExpenses(context: Context): MutableList<Expense> {
         val file = File(context.filesDir, FILE_NAME)
         if (!file.exists()) return mutableListOf()
@@ -46,11 +44,10 @@ object ExpenseDataManager {
         }
     }
 
-    // Delete an expense entry
     fun deleteExpense(context: Context, expenses: MutableList<Expense>, index: Int) {
-        if (index in expenses.indices) {
-            expenses.removeAt(index)
-            saveExpenses(context, expenses) // Persist changes
-        }
+        expenses.removeAt(index)
+        saveExpenses(context, expenses)
     }
 }
+
+
