@@ -45,4 +45,12 @@ object ExpenseDataManager {
             mutableListOf()
         }
     }
+
+    // Delete an expense entry
+    fun deleteExpense(context: Context, expenses: MutableList<Expense>, index: Int) {
+        if (index in expenses.indices) {
+            expenses.removeAt(index)
+            saveExpenses(context, expenses) // Persist changes
+        }
+    }
 }

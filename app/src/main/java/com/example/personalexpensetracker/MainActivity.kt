@@ -100,6 +100,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     private val CAMERA_PERMISSION_CODE = 100
@@ -162,6 +166,81 @@ sealed class Screen(val route: String) {
     object Overview : Screen("overview")
     object AddExpense : Screen("addExpense")
     object SelectCategory : Screen("selectCategory")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditExpenseScreen(navController: NavController, expense: Expense, onSave: (Expense) -> Unit) {
+    var category by remember { mutableStateOf(expense.category) }
+    var description by remember { mutableStateOf(expense.description ?: "") }
+    var amount by remember { mutableStateOf(expense.amount.toString()) }
+    var dateTime by remember { mutableStateOf(expense.dateTime) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Edit Expense") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedTextField(
+                value = category,
+                onValueChange = { category = it },
+                label = { Text("Category") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Amount") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = dateTime,
+                onValueChange = { dateTime = it },
+                label = { Text("Date and Time") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(
+                onClick = {
+                    val updatedExpense = expense.copy(
+                        category = category,
+                        description = description,
+                        amount = amount.toDoubleOrNull() ?: expense.amount,
+                        dateTime = dateTime
+                    )
+                    onSave(updatedExpense)
+                    navController.popBackStack()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Save Changes")
+            }
+        }
+    }
 }
 
 @Composable
@@ -256,18 +335,73 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                             .fillMaxWidth()
                             .padding(8.dp)
                     ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
-                            Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Amount: $${expense.amount}", style = MaterialTheme.typography.bodyMedium)
-                            expense.imageUri?.let {
-                                Image(
-                                    painter = rememberAsyncImagePainter(it),
-                                    contentDescription = "Receipt Image",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(150.dp)
+                        Row( // Use Row to position text and delete button in the same horizontal line
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween // Pushes items to left & right
+                        ) {
+                            Column(Modifier.weight(1f)) { // Makes sure text takes available space
+                                Text(
+                                    "Category: ${expense.category}",
+                                    style = MaterialTheme.typography.bodyLarge
                                 )
+                                Text(
+                                    "Description: ${expense.description ?: "N/A"}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    "Amount: $${expense.amount}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Date: " + LocalDateTime.parse(
+                                        expense.dateTime,
+                                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                                    ).format(DateTimeFormatter.ofPattern("EEEE, dd MMM, h:mm a")),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                expense.imageUri?.let {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(it),
+                                        contentDescription = "Receipt Image",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(150.dp)
+                                    )
+                                }
+                            }
+
+                            // Edit and Delete Buttons positioned side by side
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        navController.currentBackStackEntry?.savedStateHandle?.set("editingExpense", expense)
+                                        // navController.navigate(Screen.EditExpense.route)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = android.R.drawable.ic_menu_edit),
+                                        contentDescription = "Edit",
+                                        tint = Color.Blue
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        ExpenseDataManager.deleteExpense(context, expenses, index)
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = android.R.drawable.ic_menu_delete),
+                                        contentDescription = "Delete",
+                                        tint = Color.Red
+                                    )
+                                }
                             }
                         }
                     }
@@ -275,7 +409,7 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             }
         }
 
-        // Bottom Sheet for FAB Options
+            // Bottom Sheet for FAB Options
         if (showBottomSheet) {
             ModalBottomSheet(
                 onDismissRequest = { showBottomSheet = false }
