@@ -108,6 +108,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.example.personalexpensetracker.CategoryIcon
 
 class MainActivity : ComponentActivity() {
     private val CAMERA_PERMISSION_CODE = 100
@@ -213,16 +214,18 @@ fun ExpenseApp() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>) {
-    var showBottomSheet by remember { mutableStateOf(false) } // State to control bottom sheet visibility
+    var showBottomSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    // Initialize the selected month/year to the current month/year.
+    var selectedMonth by remember { mutableIntStateOf(LocalDate.now().monthValue) }
+    var selectedYear by remember { mutableIntStateOf(LocalDate.now().year) }
 
-    // Image Picker Launcher
+    // Launcher for image selection from the gallery remains the same...
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
             uri?.let {
                 Toast.makeText(context, "Selected Image: $uri", Toast.LENGTH_SHORT).show()
-                // Navigate to add expense screen with the selected image URI
                 navController.currentBackStackEntry
                     ?.savedStateHandle
                     ?.set("selectedImageUri", it.toString())
@@ -230,6 +233,8 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             }
         }
     )
+
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -240,31 +245,45 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                showBottomSheet = true }) {
+            FloatingActionButton(onClick = { showBottomSheet = true }) {
                 Text("+")
             }
         }
     ) { paddingValues ->
+        // Compute the expense totals by category for the pie chart.
+        val expenseByCategory: Map<String, Double> = expenses
+            .groupBy { it.category }
+            .mapValues { entry -> entry.value.sumOf { it.amount } }
+
         Column(
             Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Total Expense Overview
+            // Display Total Expense
             Text(
-                text = "Total Expense: $${expenses.sumOf { it.amount }}",
+                text = "Total Expense: \n$${expenses.sumOf { it.amount }}",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Title for the Expense List
+            // Use the new container with the header, centered pie chart, and legend.
+            ExpenseChartContainer(
+                expenseData = expenseByCategory,
+                monthYear = "March '25", // Replace with dynamic data as needed.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+            )
+
+            // Expense List Title
             Text(
                 text = "Expense List",
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
+
             // Expense List
             LazyColumn(Modifier.fillMaxSize()) {
                 items(expenses.size) { index ->
@@ -281,20 +300,44 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Display the category icon beside the category name
                             Column(Modifier.weight(1f)) {
-                                Text("Category: ${expense.category}", style = MaterialTheme.typography.bodyLarge)
-                                Text("Description: ${expense.description ?: "N/A"}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Amount: $${"%.2f".format(expense.amount)}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Date: ${expense.dateTime}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CategoryIcon(
+                                        category = expense.category,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = expense.category,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                                Text(
+                                    text = "Description: ${expense.description ?: "N/A"}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Amount: $${"%.2f".format(expense.amount)}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Date: ${expense.dateTime}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
                             }
 
-                            // Edit Button
                             IconButton(
                                 onClick = {
                                     if (index in expenses.indices) {
                                         navController.navigate("editExpense/$index")
                                     } else {
-                                        Toast.makeText(context, "Invalid expense selection", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            "Invalid expense selection",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 },
                                 modifier = Modifier.size(32.dp)
@@ -306,7 +349,6 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                                 )
                             }
 
-                            // Delete Button
                             IconButton(
                                 onClick = {
                                     ExpenseDataManager.deleteExpense(context, expenses, index)
@@ -326,60 +368,58 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
         }
     }
 
-            // Bottom Sheet for FAB Options
-        if (showBottomSheet) {
-            ModalBottomSheet(
-                onDismissRequest = { showBottomSheet = false }
+    // Bottom sheet implementation remains the same...
+    if (showBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBottomSheet = false }
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Text(
+                    text = "Add Expense",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Button(
+                    onClick = {
+                        showBottomSheet = false
+                        (context as MainActivity).requestCameraPermission(context, navController)
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = "Add Expense",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-
-                    Button(
-                        onClick = {
-                            showBottomSheet = false
-                            (context as MainActivity).requestCameraPermission(context, navController)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Camera")
-                    }
-
-                    Button(
-                        onClick = {
-                            showBottomSheet = false
-                            galleryLauncher.launch("image/*") // Opens gallery
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Image Gallery")
-                    }
-
-                    Button(
-                        onClick = {
-                            showBottomSheet = false
-                            navController.navigate("addExpense") // Navigate to AddExpenseScreen
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Add Manually")
-                    }
+                    Text("Camera")
+                }
+                Button(
+                    onClick = {
+                        showBottomSheet = false
+                        galleryLauncher.launch("image/*")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Image Gallery")
+                }
+                Button(
+                    onClick = {
+                        showBottomSheet = false
+                        navController.navigate("addExpense")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add Manually")
                 }
             }
         }
     }
+}
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense>) {
-    var category by rememberSaveable { mutableStateOf("Others") }
+    var category by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
     var amount by rememberSaveable { mutableStateOf("") }
     var imageUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -392,19 +432,18 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         // Set imageUri to the image captured by the camera
         savedStateHandle?.get<String>("capturedImageUri")?.let {
             imageUri = it
-            savedStateHandle.remove<String>("capturedImageUri") // Remove after retrieving
+            savedStateHandle.remove<String>("capturedImageUri")
         }
         // Set imageUri to the image selected from the gallery
         savedStateHandle?.get<String>("selectedImageUri")?.let {
             imageUri = it
-            savedStateHandle.remove<String>("selectedImageUri") // Remove after retrieving
+            savedStateHandle.remove<String>("selectedImageUri")
         }
     }
     savedStateHandle?.getLiveData<String>("category")?.observeForever { selectedCategory ->
         category = selectedCategory
-        savedStateHandle.remove<String>("category") // Remove after retrieving
+        savedStateHandle.remove<String>("category")
     }
-
 
     // Function to extract text using OCR
     suspend fun extractTextFromImage(imageUri: Uri) {
@@ -426,7 +465,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         }
     }
 
-    // When an image is selected, trigger OCR
+    // Trigger OCR when an image is selected
     LaunchedEffect(imageUri) {
         imageUri?.let {
             extractTextFromImage(Uri.parse(it))
@@ -435,7 +474,6 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
 
     Scaffold(
         topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("Add Expense") },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -451,11 +489,19 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Updated category selection button that includes the icon
             Button(
                 onClick = { navController.navigate(Screen.SelectCategory.route) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = if (category.isEmpty()) "Select Category" else "Category: $category")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Use the CategoryIcon composable
+                    CategoryIcon(category = category, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (category.isEmpty()) "Select Category" else "$category")
+                }
             }
 
             TextField(
@@ -517,12 +563,12 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategorySelectionScreen(navController: NavController, onCategorySelected: (String) -> Unit) {
     val categories = listOf("Food", "Transport", "Shopping", "Entertainment", "Utilities", "Other")
     Scaffold(
         topBar = {
-            @OptIn(ExperimentalMaterial3Api::class)
             TopAppBar(
                 title = { Text("Select Category") },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -555,11 +601,17 @@ fun CategorySelectionScreen(navController: NavController, onCategorySelected: (S
                                 navController.popBackStack()
                             }
                     ) {
-                        Text(
-                            text = category,
+                        Row(
                             modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CategoryIcon(category = category, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = category,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
                 }
             }
