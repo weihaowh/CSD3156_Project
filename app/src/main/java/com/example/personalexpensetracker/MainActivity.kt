@@ -288,10 +288,12 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
             LazyColumn(Modifier.fillMaxSize()) {
                 items(expenses.size) { index ->
                     val expense = expenses[index]
+                    var isExpanded by remember { mutableStateOf(false) }
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp)
+                            .clickable { isExpanded = !isExpanded }, // Toggle expansion
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
                         Row(
@@ -313,8 +315,16 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                                         style = MaterialTheme.typography.bodyLarge
                                     )
                                 }
+                                val previewLength = 50
+                                val descriptionText = expense.description ?: "No description"
+                                val shouldTruncate = descriptionText.length > previewLength
+                                val displayText = if (!isExpanded && shouldTruncate) {
+                                    descriptionText.take(previewLength) + "..."
+                                } else {
+                                    descriptionText
+                                }
                                 Text(
-                                    text = "Description: ${expense.description ?: "N/A"}",
+                                    text = "Description: $displayText",
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
@@ -326,6 +336,14 @@ fun OverviewScreen(navController: NavController, expenses: MutableList<Expense>)
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.Gray
                                 )
+                                if (!isExpanded && shouldTruncate) {
+                                    Text(
+                                        text = "Tap to expand",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
                             }
 
                             IconButton(
@@ -508,12 +526,17 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 value = description,
                 onValueChange = { description = it },
                 label = { Text("Description") },
+                modifier = Modifier
+                    .fillMaxWidth(),
                 singleLine = true
             )
             TextField(
                 value = amount,
                 onValueChange = { amount = it },
                 label = { Text("Amount") },
+                modifier = Modifier
+                    .fillMaxWidth(),
+                singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
 
