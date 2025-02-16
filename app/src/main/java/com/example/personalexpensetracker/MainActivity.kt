@@ -473,7 +473,19 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             try {
                 val result = withContext(Dispatchers.IO) { recognizer.process(inputImage).await() }
                 if (result.text.isNotEmpty()) {
-                    description = result.text // Auto-fill the description field
+                    // Auto-fill description and try extracting amount
+                    description = result.text
+
+                    // Extract possible price (e.g., $10.50)
+                    val priceRegex = Regex("""\$\d+(\.\d{1,2})?""")
+                    val priceMatch = priceRegex.find(result.text)
+                    if (priceMatch != null) {
+                        amount = priceMatch.value.replace("$", "") // Remove the '$' symbol
+                    }
+                    else
+                    {
+                        Toast.makeText(context, "No price found in receipt.", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
                     Toast.makeText(context, "No text found in receipt.", Toast.LENGTH_SHORT).show()
                 }
@@ -482,6 +494,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             }
         }
     }
+
 
     // Trigger OCR when an image is selected
     LaunchedEffect(imageUri) {
