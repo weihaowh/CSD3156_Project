@@ -464,25 +464,19 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
     }
 
     fun extractTotalAmount(receiptText: String): String? {
-        val totalKeywords = listOf("Total", "Grand Total", "Amount Due", "Balance Due", "TOTAL")
+        // Regular expression to match monetary values (e.g., 12.99, 1,234.56, $5.00)
+        val priceRegex = Regex("""(\d{1,3}(,\d{3})*(\.\d{2})?)""")
 
-        val lines = receiptText.split("\n") // Split the text into lines for better accuracy
+        // Extract all matches from the receipt text
+        val matches = priceRegex.findAll(receiptText).map { it.value.replace(",", "").toDouble() }.toList()
 
-        for (line in lines) {
-            for (keyword in totalKeywords) {
-                if (line.contains(keyword, ignoreCase = true)) {
-                    // Try to extract the number after the keyword
-                    val priceRegex = Regex("""(\d{1,3}(,\d{3})*(\.\d{2})?)""") // Matches common price formats
-                    val priceMatch = priceRegex.find(line)
-
-                    if (priceMatch != null) {
-                        return priceMatch.value.replace(",", "") // Remove commas from numbers like "1,234.56"
-                    }
-                }
-            }
+        return if (matches.isNotEmpty()) {
+            matches.maxOrNull()?.toString() // Return the highest number found
+        } else {
+            null
         }
-        return null // Return null if no total amount is found
     }
+
 
     // Function to extract text using OCR
     suspend fun extractTextFromImage(imageUri: Uri) {
@@ -496,15 +490,15 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 val extractedText = result.text
 
                 if (extractedText.isNotEmpty()) {
-                    description = extractedText // Store the entire receipt text for reference
+                    description = extractedText // Store full receipt text for reference
 
-                    // Try to extract the total amount using keyword matching
+                    // Extract highest numerical value as the total amount
                     val totalAmount = extractTotalAmount(extractedText)
 
                     if (totalAmount != null) {
-                        amount = totalAmount // Set the total amount field
+                        amount = totalAmount // Set total amount field
                     } else {
-                        Toast.makeText(context, "Could not detect total amount.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "No valid total amount detected.", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     Toast.makeText(context, "No text found in receipt.", Toast.LENGTH_SHORT).show()
@@ -514,6 +508,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             }
         }
     }
+
 
 
     // Trigger OCR when an image is selected
