@@ -477,6 +477,36 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         }
     }
 
+    fun extractMerchantName(receiptText: String): String {
+        val lines = receiptText.split("\n") // Split text into lines
+
+        // Common business suffixes
+        val businessKeywords = listOf("Pte Ltd", "Sdn. Bhd.", "LLC", "Inc.", "Corp.", "Company", "Co.", "Limited", "Enterprises")
+
+        var firstValidLine: String? = null // Store first potential merchant name
+
+        for (line in lines) {
+            val trimmedLine = line.trim()
+
+            // Ignore lines that contain numbers (addresses, transaction IDs, dates)
+            if (trimmedLine.any { it.isDigit() }) continue
+
+            // Ignore fully uppercase words (headers, card types, etc.)
+            if (trimmedLine == trimmedLine.uppercase()) continue
+
+            // If the line contains a known business keyword, return it immediately
+            if (businessKeywords.any { keyword -> trimmedLine.contains(keyword, ignoreCase = true) }) {
+                return trimmedLine
+            }
+
+            // Store the first valid line in case no business keywords are found
+            if (firstValidLine == null) {
+                firstValidLine = trimmedLine
+            }
+        }
+
+        return firstValidLine ?: "Unknown Merchant" // Use first valid text-based line if no business keyword match
+    }
 
     // Function to extract text using OCR
     suspend fun extractTextFromImage(imageUri: Uri) {
@@ -490,7 +520,8 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 val extractedText = result.text
 
                 if (extractedText.isNotEmpty()) {
-                    description = extractedText // Store full receipt text for reference
+                    //description = extractedText // Store full receipt text for reference
+                    description = extractMerchantName(extractedText)
 
                     // Extract highest valid monetary value as total
                     val totalAmount = extractTotalAmount(extractedText)
