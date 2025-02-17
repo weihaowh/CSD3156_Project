@@ -464,14 +464,14 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
     }
 
     fun extractTotalAmount(receiptText: String): String? {
-        // Regular expression to match monetary values (e.g., 12.99, 1,234.56, $5.00)
-        val priceRegex = Regex("""(\d{1,3}(,\d{3})*(\.\d{2})?)""")
+        // Regular expression to match numbers with decimal points (e.g., 12.99, 1234.56)
+        val priceRegex = Regex("""\b\d+\.\d{2}\b""")
 
-        // Extract all matches from the receipt text
-        val matches = priceRegex.findAll(receiptText).map { it.value.replace(",", "").toDouble() }.toList()
+        // Extract all numbers that match the monetary format
+        val matches = priceRegex.findAll(receiptText).map { it.value.toDouble() }.toList()
 
         return if (matches.isNotEmpty()) {
-            matches.maxOrNull()?.toString() // Return the highest number found
+            matches.maxOrNull()?.toString() // Return the highest valid amount
         } else {
             null
         }
@@ -492,7 +492,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
                 if (extractedText.isNotEmpty()) {
                     description = extractedText // Store full receipt text for reference
 
-                    // Extract highest numerical value as the total amount
+                    // Extract highest valid monetary value as total
                     val totalAmount = extractTotalAmount(extractedText)
 
                     if (totalAmount != null) {
@@ -508,6 +508,7 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             }
         }
     }
+
 
 
 
