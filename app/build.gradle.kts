@@ -70,4 +70,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.6.4")
     implementation(libs.litert.support.api)
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation(libs.vision.common)
 }
