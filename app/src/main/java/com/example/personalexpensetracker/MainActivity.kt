@@ -463,6 +463,27 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
         savedStateHandle.remove<String>("category")
     }
 
+    fun extractTotalAmount(receiptText: String): String? {
+        val totalKeywords = listOf("Total", "Grand Total", "Amount Due", "Balance Due", "TOTAL")
+
+        val lines = receiptText.split("\n") // Split the text into lines for better accuracy
+
+        for (line in lines) {
+            for (keyword in totalKeywords) {
+                if (line.contains(keyword, ignoreCase = true)) {
+                    // Try to extract the number after the keyword
+                    val priceRegex = Regex("""(\d{1,3}(,\d{3})*(\.\d{2})?)""") // Matches common price formats
+                    val priceMatch = priceRegex.find(line)
+
+                    if (priceMatch != null) {
+                        return priceMatch.value.replace(",", "") // Remove commas from numbers like "1,234.56"
+                    }
+                }
+            }
+        }
+        return null // Return null if no total amount is found
+    }
+
     // Function to extract text using OCR
     suspend fun extractTextFromImage(imageUri: Uri) {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -472,19 +493,18 @@ fun AddExpenseScreen(navController: NavController, expenses: MutableList<Expense
             val inputImage = InputImage.fromBitmap(it, 0)
             try {
                 val result = withContext(Dispatchers.IO) { recognizer.process(inputImage).await() }
-                if (result.text.isNotEmpty()) {
-                    // Auto-fill description and try extracting amount
-                    description = result.text
+                val extractedText = result.text
 
-                    // Extract possible price (e.g., $10.50)
-                    val priceRegex = Regex("""\$\d+(\.\d{1,2})?""")
-                    val priceMatch = priceRegex.find(result.text)
-                    if (priceMatch != null) {
-                        amount = priceMatch.value.replace("$", "") // Remove the '$' symbol
-                    }
-                    else
-                    {
-                        Toast.makeText(context, "No price found in receipt.", Toast.LENGTH_SHORT).show()
+                if (extractedText.isNotEmpty()) {
+                    description = extractedText // Store the entire receipt text for reference
+
+                    // Try to extract the total amount using keyword matching
+                    val totalAmount = extractTotalAmount(extractedText)
+
+                    if (totalAmount != null) {
+                        amount = totalAmount // Set the total amount field
+                    } else {
+                        Toast.makeText(context, "Could not detect total amount.", Toast.LENGTH_SHORT).show()
                     }
                 } else {
                     Toast.makeText(context, "No text found in receipt.", Toast.LENGTH_SHORT).show()
